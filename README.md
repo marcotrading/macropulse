@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MacroPulse
+
+MacroPulse is a modern, interactive dashboard built with Next.js that tracks key US macroeconomic indicators in real-time. It aggregates data from the Federal Reserve Economic Data (FRED) API to provide a comprehensive snapshot of the economic health of the United States.
+
+## Features
+
+-   **Real-time Dashboard:** Visualize economic metrics grouped by category:
+    -   Growth & Output
+    -   Labor Market
+    -   Inflation & Prices
+    -   Sentiment & Markets
+-   **Composite Health Score:** A weighted average score (0-100) representing the overall economic condition.
+-   **Trend Analysis:** Visual indicators for short-term trends (Leading, Lagging, Coincident).
+-   **Strength Meter:** Visual percentile rank for each indicator based on a 5-year historical lookback.
+-   **Interactive Charts:** Detailed historical views using Recharts.
+-   **Dark Mode Support:** Fully responsive design with light and dark themes.
+
+## Tech Stack
+
+-   **Framework:** [Next.js 15](https://nextjs.org/) (App Router)
+-   **Language:** JavaScript (React components) & TypeScript (Configuration)
+-   **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
+-   **UI Components:** [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind)
+-   **Icons:** [Lucide React](https://lucide.dev/)
+-   **Charting:** [Recharts](https://recharts.org/)
+-   **Data Fetching:** [Axios](https://axios-http.com/)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+-   Node.js (v18 or higher recommended)
+-   npm, yarn, pnpm, or bun
+-   **FRED API Key:** You need an API key from [FRED (Federal Reserve Economic Data)](https://fred.stlouisfed.org/docs/api/api_key.html).
+
+### Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/your-username/macro-dashboard.git
+    cd macro-dashboard
+    ```
+
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+3.  Configure Environment Variables:
+    Create a `.env.local` file in the root directory and add your FRED API key:
+    ```env
+    NEXT_PUBLIC_FRED_API_KEY=your_api_key_here
+    ```
+
+### Running the Application
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser to view the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+-   `src/app`: App Router pages and API routes.
+    -   `page.js`: Main dashboard entry point.
+    -   `api/fred/route.js`: Server-side proxy for secure FRED API requests.
+-   `src/components`: React components including the main dashboard and detailed views.
+-   `src/lib`: Utility functions and data transformation logic.
 
-## Learn More
+## Contributing
 
-To learn more about Next.js, take a look at the following resources:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is open source and available under the [MIT License](LICENSE).
