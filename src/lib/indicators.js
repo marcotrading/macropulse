@@ -25,8 +25,9 @@ export const INDICATORS = [
 
   { id: "UMCSENT", frequency: "M", name: "Sentiment", narrative: "Consumer Sentiment", weight: 1, category: "Sentiment & Markets", timing: "Leading", description: "University of Michigan survey of consumer confidence regarding personal finances and business conditions." },
   { id: "VIXCLS", frequency: "D", name: "VIX", narrative: "CBOE Volatility Index", weight: 2, category: "Sentiment & Markets", timing: "Leading", description: "A real-time index that represents the market's expectations for volatility over the coming 30 days." },
-  { id: "DGS10", frequency: "D", name: "10Y Yield", narrative: "10-Year Treasury Yield", weight: 2, category: "Sentiment & Markets", timing: "Leading", description: "The yield on the 10-year US Treasury note. A benchmark for mortgage rates and long-term borrowing costs." },
-  { id: "DGS2", frequency: "D", name: "2Y Yield", narrative: "2-Year Treasury Yield", weight: 2, category: "Sentiment & Markets", timing: "Leading", description: "The yield on the 2-year US Treasury note. Highly sensitive to Fed policy expectations." },
+  { id: "DGS10", frequency: "D", name: "10Y Yield", narrative: "10-Year Treasury Yield", weight: 0, category: "Sentiment & Markets", timing: "Leading", description: "The yield on the 10-year US Treasury note. A benchmark for mortgage rates and long-term borrowing costs." },
+  { id: "DGS2", frequency: "D", name: "2Y Yield", narrative: "2-Year Treasury Yield", weight: 0, category: "Sentiment & Markets", timing: "Leading", description: "The yield on the 2-year US Treasury note. Highly sensitive to Fed policy expectations." },
+  { id: "T10Y2Y", frequency: "D", name: "10Y–2Y Spread", narrative: "10-Year minus 2-Year Treasury Spread", weight: 2, category: "Sentiment & Markets", timing: "Leading", description: "Long minus short Treasury yield. An inversion (below zero) has preceded every US recession since 1980; the curve usually re-steepens just before the downturn starts." },
 ];
 
 export const INDICATOR_BEHAVIOR = {
@@ -45,8 +46,9 @@ export const INDICATOR_BEHAVIOR = {
   UNRATE: "lower_is_better",
   ICSA: "lower_is_better",
   PPIACO: "lower_is_better",
-  DGS10: "lower_is_better",
-  DGS2: "lower_is_better",
+  DGS10: "lower_is_better", // weight 0: yields also fall ahead of recessions, so the level is ambiguous; T10Y2Y carries the rates signal
+  DGS2: "lower_is_better", // weight 0, see DGS10
+  T10Y2Y: "higher_is_better", // Percentile of the current spread; does not flag a recent inversion that has re-steepened
   FEDFUNDS: "lower_is_better", // Context dependent, but usually ease is better for markets
   M2SL: "higher_is_better", // Scored on YoY growth: more liquidity supports future activity
   DCOILWTICO: "lower_is_better",

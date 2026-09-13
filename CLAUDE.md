@@ -41,7 +41,7 @@ To add an indicator, add entries to both. The dashboard fetches every id in `IND
 - If an indicator has fewer than 2 points, its score defaults to 50.
 - Trend compares the last two observations.
 - Sparklines show only the last 12 points.
-- The composite health score is the `weight`-weighted average of all indicator scores. `weight: 0` keeps an indicator's card (marked "not in composite") but excludes it from the composite and the indicator count; a missing weight defaults to 1.
+- The composite health score is the `weight`-weighted average of all indicator scores. `weight: 0` keeps an indicator's card (marked "not in composite") but excludes it from the composite and the indicator count; a missing weight defaults to 1. Trade Balance and the 2Y/10Y yield levels are weight 0; the rates signal comes from the 10Y–2Y spread (`T10Y2Y`), because yield levels also fall ahead of recessions.
 
 **Detail view (`IndicatorDetail.js`).** Opens as a dialog when you select an indicator. It fetches that series together with `USREC`, which it turns into recession shading bands, plus an optional comparison series. The YoY toggle runs `calculateYoY` (`src/lib/data-transforms.js`), which matches points by `YYYY-MM` one year apart, so it assumes monthly-granularity data. `globalBrushState` lives in `MacroDashboard`, so the chart's brushed date range persists across detail views.
 
