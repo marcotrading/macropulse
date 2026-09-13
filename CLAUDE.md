@@ -14,6 +14,7 @@ npm run dev     # dev server (Turbopack) at http://localhost:3000
 npm run build   # production build (Turbopack)
 npm run start   # serve production build
 npm run lint    # ESLint (next/core-web-vitals + next/typescript)
+npm run backtest  # recomputes composite bands, cycle/breadth averages and alert track records from FRED history (reads .env.local)
 ```
 
 No test framework is set up.
@@ -22,7 +23,7 @@ Requires `NEXT_PUBLIC_FRED_API_KEY` in `.env.local` at the repo root. Without it
 
 ## Architecture
 
-**Mixed JS/TS.** The app logic is plain JavaScript (`page.js`, `MacroDashboard.js`, `IndicatorDetail.js`, `src/lib/*.js`, `api/fred/route.js`, `ui/card.js`). Layout, theme components, and most shadcn `ui/*` files are TypeScript. `allowJs` is on, so both work. Import paths use the `@/*` → `src/*` alias.
+**Mixed JS/TS.** The app logic is plain JavaScript (`page.js`, `MacroDashboard.js`, `IndicatorDetail.js`, `SignalTiles.js`, `src/lib/*.js`, `api/fred/route.js`, `ui/card.js`, `scripts/backtest-composite.mjs`). Layout, theme components, and most shadcn `ui/*` files are TypeScript. `allowJs` is on, so both work. Import paths use the `@/*` → `src/*` alias.
 
 **Data flow.** All FRED access goes through one server-side proxy:
 
@@ -30,21 +31,25 @@ Requires `NEXT_PUBLIC_FRED_API_KEY` in `.env.local` at the repo root. Without it
 - The client components call this route with axios inside `useEffect` (both are `"use client"`). No other data layer exists.
 
 **Indicator registry.** `src/lib/indicators.js` is the single source of truth:
-- `INDICATORS`: FRED series id, display name, `weight`, `category` (the dashboard's group sections), `timing` (Leading/Lagging/Coincident/null, used by the timing filter), `frequency` (FRED short code `Q`/`M`/`W`/`D`, used by `formatObservationDate` to label dates, e.g. `Q2 2026` instead of `2026-04-01`), optional `scoreBasis: "yoy"` (score, trend, sparkline and card value use YoY % change instead of the level; set on steadily trending series), and description.
+- `INDICATORS`: FRED series id, display name, `weight`, `category` (the dashboard's group sections), `timing` (Leading/Lagging/Coincident/null, used by the timing filter), `frequency` (FRED short code `Q`/`M`/`W`/`D`, used by `formatObservationDate` to label dates, e.g. `Q2 2026` instead of `2026-04-01`), optional `scoreBasis: "yoy"` (score, trend, sparkline and card value use YoY % change instead of the level; set on steadily trending series), optional `deflator` (FRED price index id: the nominal series is converted to real terms with `toRealLevels` before YoY and scoring, and charted in latest-month dollars in the detail view; used by Durable Goods), and description. Real GDP, Real Retail Sales and Real M2 use FRED's own inflation-adjusted series.
 - `INDICATOR_BEHAVIOR`: maps each id to `higher_is_better` or `lower_is_better`, which sets the direction of its score.
 
 To add an indicator, add entries to both. The dashboard fetches every id in `INDICATORS` automatically.
 
-**Scoring (`MacroDashboard.js`).** The dashboard fetches 6 years of history for every indicator in a single request and scores over the last 5.
+**Scoring (`src/lib/scoring.js`).** The dashboard fetches 6 years of history for every indicator, price index and alert series in a single request and scores over the last 5. The formulas live in `scoring.js` so `MacroDashboard.js` and the backtest script share them.
 - Indicators with `scoreBasis: "yoy"` are first converted with `calculateYoY` (the extra year feeds the first year-over-year values). Scoring their raw level would pin the score at 0 or 100, because a trending series is almost always at a 5-year extreme.
 - Each indicator's score (0–100) is the midrank percentile of its latest value (level, or YoY %) within the 5-year window: `(below + 0.5 × ties) / (n − 1) × 100`, where `below` and `ties` count the other points under and equal to it. The window low scores 0 and the high 100. The score is inverted for `lower_is_better`.
 - If an indicator has fewer than 2 points, its score defaults to 50.
 - Trend (`calculateTrend` in `data-transforms.js`) compares the average of the last month of observations with the average of the month ending 3 months earlier, anchored on the latest observation date. A change within 5% of the 5-year range reads flat. The arrow tooltip shows the change (in pp for YoY series).
 - Sparklines show the last 12 months by date.
 - The composite health score is the `weight`-weighted average of all indicator scores. `weight: 0` keeps an indicator's card (marked "not in composite") but excludes it from the composite and the indicator count; a missing weight defaults to 1. Trade Balance and the 2Y/10Y yield levels are weight 0; the rates signal comes from the 10Y–2Y spread (`T10Y2Y`), because yield levels also fall ahead of recessions.
-- The composite label, color and context line come from `COMPOSITE_BANDS` (Contraction <33, Slowing 33–44, Moderate 45–54, Solid Expansion 55–65, Strong Expansion 66+) and `COMPOSITE_MEDIAN`. Their recession rates are static numbers from a Sep 2026 backtest (2000–2026, revised data); re-run it if indicators, weights or the formula change.
+- The composite label, color and context line come from `COMPOSITE_BANDS` (Contraction <33, Slowing 33–44, Moderate 45–54, Solid Expansion 55–65, Strong Expansion 66+) and `BACKTEST.compositeMedian`.
+- Signal tiles (`SignalTiles.js`): the cycle breakdown is `calculateComposite` per timing group (indicators with `timing: null` count only in the overall score; clicking a row sets the timing filter). Breadth (`calculateBreadth`) counts composite indicators whose 3-month trend is improving or worsening in their good direction.
+- The band recession rates, the `BACKTEST` averages and the alert track records in `ALERT_INFO` are static output of `npm run backtest` (2000–2026 for the composite, since the 1960s–70s for alerts; revised data, no publication lags). Re-run it and update them after changing indicators, weights or formulas.
 
-**Detail view (`IndicatorDetail.js`).** Opens as a dialog when you select an indicator. It fetches that series together with `USREC`, which it turns into recession shading bands, plus an optional comparison series. The YoY toggle runs `calculateYoY` (`src/lib/data-transforms.js`), which matches points by `YYYY-MM` one year apart, so it assumes monthly-granularity data. `globalBrushState` lives in `MacroDashboard`, so the chart's brushed date range persists across detail views.
+**Alerts (`src/lib/alerts.js`).** Three fixed-threshold rules, shown in the alerts tile and not part of the composite: yield curve (`T10Y2Y`: last-month average below 0 is Triggered, a calendar month below 0 within 24 months is Watch), Sahm rule (`SAHMREALTIME` ≥ 0.5) and jobless claims (`ICSA` 4-week average ≥ 20% above a year earlier). `ALERT_SERIES` are fetched in the dashboard's single request.
+
+**Detail view (`IndicatorDetail.js`).** Opens as a dialog when you select an indicator. It fetches that series (and its `deflator`, if any) together with `USREC`, which it turns into recession shading bands, plus an optional comparison series. The YoY toggle runs `calculateYoY` (`src/lib/data-transforms.js`), which matches points by `YYYY-MM` one year apart, so it assumes monthly-granularity data. `globalBrushState` lives in `MacroDashboard`, so the chart's brushed date range persists across detail views.
 
 <!-- imported-from: gemini:project:instructions -->
 # MacroPulse

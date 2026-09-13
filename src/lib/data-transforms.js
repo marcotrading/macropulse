@@ -63,6 +63,42 @@ export function calculateYoY(data) {
 }
 
 /**
+ * Converts nominal levels to real terms with a monthly price index, in the dollars of the latest converted month.
+ * Months are matched by YYYY-MM; points whose month has no price yet are dropped.
+ * The YoY % change of the result equals the nominal YoY deflated by the index's YoY, whatever the base month.
+ *
+ * @param {Array<Object>} data - Nominal data points ({date, value}), oldest first.
+ * @param {Array<Object>} priceIndex - Price index data points ({date, value}).
+ * @returns {Array<Object>} Real data points ({date, value}).
+ */
+export function toRealLevels(data, priceIndex) {
+  if (!data?.length || !priceIndex?.length) return [];
+
+  const prices = new Map(priceIndex.map((p) => [p.date.substring(0, 7), p.value]));
+  const matched = data.filter((d) => prices.get(d.date.substring(0, 7)));
+  if (matched.length === 0) return [];
+
+  const basePrice = prices.get(matched.at(-1).date.substring(0, 7));
+  return matched.map((d) => ({
+    date: d.date,
+    value: parseFloat(((d.value * basePrice) / prices.get(d.date.substring(0, 7))).toFixed(2)),
+  }));
+}
+
+/**
+ * Formats a number with an explicit sign ("+1.2", "-0.8"), printing values that round to zero as "0" rather than "-0".
+ *
+ * @param {number} value - Number to format.
+ * @param {number} [digits=0] - Decimal places.
+ * @returns {string} Signed number.
+ */
+export function formatSigned(value, digits = 0) {
+  const rounded = Number(value.toFixed(digits));
+  if (rounded === 0) return (0).toFixed(digits);
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}`;
+}
+
+/**
  * Shifts a YYYY-MM-DD string by whole months, without Date objects (no timezone shifts).
  * The day is kept as-is, so "2026-05-31" minus 3 months gives "2026-02-31"; that still compares correctly as a string bound.
  *
