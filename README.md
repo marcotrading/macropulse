@@ -1,79 +1,43 @@
 # MacroPulse
 
-MacroPulse is a modern, interactive dashboard built with Next.js that tracks key US macroeconomic indicators in real-time. It aggregates data from the Federal Reserve Economic Data (FRED) API to provide a comprehensive snapshot of the economic health of the United States.
+A dashboard of US macroeconomic indicators built on [FRED](https://fred.stlouisfed.org/) data. It scores each indicator against its own recent history and rolls the scores into one composite health score.
 
-## Features
+## What it shows
 
--   **Real-time Dashboard:** Visualize economic metrics grouped by category:
-    -   Growth & Output
-    -   Labor Market
-    -   Inflation & Prices
-    -   Sentiment & Markets
--   **Composite Health Score:** A weighted average score (0-100) representing the overall economic condition.
--   **Trend Analysis:** Visual indicators for short-term trends (Leading, Lagging, Coincident).
--   **Strength Meter:** Visual percentile rank for each indicator based on a 5-year historical lookback.
--   **Interactive Charts:** Detailed historical views using Recharts.
--   **Dark Mode Support:** Fully responsive design with light and dark themes.
+- **25 indicators** in four groups: Growth & Output, Labor Market, Inflation & Prices, Sentiment & Markets.
+- **Strength score (0–100)** per indicator: the percentile rank of the latest value within the last 5 years, flipped where lower is better (e.g. unemployment, CPI).
+  - Steadily trending series (GDP, payrolls, CPI, M2…) are scored on year-over-year % change, since their raw level is almost always at a 5-year high.
+- **Composite health score:** weighted average of the strength scores. Some cards are shown for context only, marked "not in composite".
+- **Timing filter:** Leading, Coincident or Lagging.
+- **Detail view:** 10-year chart with recession shading, a YoY toggle and an optional comparison series.
 
-## Tech Stack
+Data is cached for 24 hours, so this is a daily snapshot, not a live feed.
 
--   **Framework:** [Next.js 15](https://nextjs.org/) (App Router)
--   **Language:** JavaScript (React components) & TypeScript (Configuration)
--   **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
--   **UI Components:** [shadcn/ui](https://ui.shadcn.com/) (Radix UI + Tailwind)
--   **Icons:** [Lucide React](https://lucide.dev/)
--   **Charting:** [Recharts](https://recharts.org/)
--   **Data Fetching:** [Axios](https://axios-http.com/)
+## Getting started
 
-## Getting Started
-
-### Prerequisites
-
--   Node.js (v18 or higher recommended)
--   npm, yarn, pnpm, or bun
--   **FRED API Key:** You need an API key from [FRED (Federal Reserve Economic Data)](https://fred.stlouisfed.org/docs/api/api_key.html).
-
-### Installation
-
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/your-username/macro-dashboard.git
-    cd macro-dashboard
-    ```
-
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-
-3.  Configure Environment Variables:
-    Create a `.env.local` file in the root directory and add your FRED API key:
-    ```env
-    NEXT_PUBLIC_FRED_API_KEY=your_api_key_here
-    ```
-
-### Running the Application
-
-Start the development server:
+Requires Node.js 18.18+ and a free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html).
 
 ```bash
-npm run dev
+git clone https://github.com/marcotrading/macropulse.git
+cd macropulse
+echo "NEXT_PUBLIC_FRED_API_KEY=your_api_key_here" > .env.local
+./start.sh
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the dashboard.
+Then open http://localhost:3000.
 
-## Project Structure
+`start.sh` checks Node, the API key, dependencies and the port before starting the dev server.
+- `./start.sh prod` builds and serves a production build.
+- `PORT=4000 ./start.sh` uses a different port.
 
--   `src/app`: App Router pages and API routes.
-    -   `page.js`: Main dashboard entry point.
-    -   `api/fred/route.js`: Server-side proxy for secure FRED API requests.
--   `src/components`: React components including the main dashboard and detailed views.
--   `src/lib`: Utility functions and data transformation logic.
+## Customizing indicators
 
-## Contributing
+All indicators live in `src/lib/indicators.js`. To add one:
+1. Add an entry to `INDICATORS` with the FRED series id, weight, category, timing and frequency.
+2. Add its direction (`higher_is_better` / `lower_is_better`) to `INDICATOR_BEHAVIOR`.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Set `weight: 0` to show a card without counting it in the composite.
 
-## License
+## Tech stack
 
-This project is open source and available under the [MIT License](LICENSE).
+Next.js 15 (App Router), React 19, Tailwind CSS v4, shadcn/ui, Recharts. All FRED requests go through a server-side proxy at `src/app/api/fred/route.js`.
