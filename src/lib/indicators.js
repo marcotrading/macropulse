@@ -1,13 +1,13 @@
 export const INDICATORS = [
-  { id: "GDP", frequency: "Q", scoreBasis: "yoy", name: "GDP", narrative: "Gross Domestic Product", weight: 3, category: "Growth & Output", timing: "Coincident", description: "Total value of goods and services produced in the US. The primary measure of economic health." },
-  { id: "RSXFS", frequency: "M", scoreBasis: "yoy", name: "Retail Sales", narrative: "Retail Sales", weight: 2, category: "Growth & Output", timing: "Coincident", description: "Total receipts of retail stores. A key indicator of consumer spending confidence." },
+  { id: "GDPC1", frequency: "Q", scoreBasis: "yoy", name: "Real GDP", narrative: "Real Gross Domestic Product", weight: 3, category: "Growth & Output", timing: "Coincident", description: "Inflation-adjusted value of goods and services produced in the US (chained 2017 dollars). The primary measure of economic growth." },
+  { id: "RRSFS", frequency: "M", scoreBasis: "yoy", name: "Real Retail Sales", narrative: "Real Retail and Food Services Sales", weight: 2, category: "Growth & Output", timing: "Coincident", description: "Retail and food services sales, adjusted for inflation with the CPI by the Census Bureau. A key gauge of real consumer spending." },
   { id: "INDPRO", frequency: "M", scoreBasis: "yoy", name: "Ind. Production", narrative: "Industrial Production Index", weight: 2, category: "Growth & Output", timing: "Coincident", description: "Real output of all manufacturing, mining, and electric/gas utility facilities." },
   { id: "HOUST", frequency: "M", name: "Housing Starts", narrative: "Housing Starts", weight: 1, category: "Growth & Output", timing: "Leading", description: "Number of new residential construction projects that have begun. Highly sensitive to rates." },
   { id: "CSUSHPINSA", frequency: "M", scoreBasis: "yoy", name: "Home Prices", narrative: "Case-Shiller Home Price Index", weight: 2, category: "Growth & Output", timing: "Lagging", description: "The leading measure of US residential real estate prices (National Index)." },
   { id: "BOPGSTB", frequency: "M", name: "Trade Balance", narrative: "Trade Balance (Goods & Services)", weight: 0, category: "Growth & Output", timing: "Coincident", description: "Difference between the value of US exports and imports. A deficit means imports exceed exports." },
   { id: "DCOILWTICO", frequency: "D", name: "Oil", narrative: "Crude Oil Prices WTI", weight: 1, category: "Growth & Output", timing: null, description: "Price per barrel of West Texas Intermediate crude. A key driver of headline inflation." },
   { id: "PSAVERT", frequency: "M", name: "Saving Rate", narrative: "Personal Saving Rate", weight: 1, category: "Growth & Output", timing: null, description: "Personal saving as a percentage of disposable personal income. Indicates consumer financial health." },
-  { id: "DGORDER", frequency: "M", scoreBasis: "yoy", name: "Durable Goods", narrative: "Durable Goods Orders", weight: 2, category: "Growth & Output", timing: "Leading", description: "New orders placed with domestic manufacturers for delivery of factory hard goods (lasting 3+ years)." },
+  { id: "DGORDER", deflator: "WPSFD4131", frequency: "M", scoreBasis: "yoy", name: "Durable Goods (real)", narrative: "Durable Goods Orders, inflation-adjusted", weight: 2, category: "Growth & Output", timing: "Leading", description: "New orders for factory hard goods (lasting 3+ years), adjusted for inflation with the PPI for finished goods less food and energy (WPSFD4131)." },
   { id: "TCU", frequency: "M", name: "Capacity Util.", narrative: "Capacity Utilization Rate", weight: 1, category: "Growth & Output", timing: "Coincident", description: "The percentage of the economy's aggregate production capacity that is actually being used." },
   { id: "TDSP", frequency: "Q", name: "HH Debt Service", narrative: "Household Debt Service Ratio", weight: 1, category: "Growth & Output", timing: "Lagging", description: "Total required household debt payments as a percent of disposable personal income." },
 
@@ -21,7 +21,7 @@ export const INDICATORS = [
   { id: "CPIAUCSL", frequency: "M", scoreBasis: "yoy", name: "CPI", narrative: "Consumer Price Index", weight: 3, category: "Inflation & Prices", timing: "Lagging", description: "Measure of the average change over time in prices paid by urban consumers for a market basket of consumer goods." },
   { id: "PPIACO", frequency: "M", scoreBasis: "yoy", name: "PPI", narrative: "Producer Price Index", weight: 2, category: "Inflation & Prices", timing: "Coincident", description: "Measure of the average change over time in the selling prices received by domestic producers." },
   { id: "FEDFUNDS", frequency: "M", name: "Fed Funds Rate", narrative: "Effective Federal Funds Rate", weight: 3, category: "Inflation & Prices", timing: "Lagging", description: "The interest rate at which depository institutions trade federal funds (balances held at Federal Reserve Banks) overnight." },
-  { id: "M2SL", frequency: "M", scoreBasis: "yoy", name: "M2", narrative: "Money Supply M2", weight: 1, category: "Inflation & Prices", timing: "Leading", description: "Measure of the money supply that includes cash, checking deposits, and easily convertible near money." },
+  { id: "M2REAL", frequency: "M", scoreBasis: "yoy", name: "Real M2", narrative: "Real M2 Money Stock", weight: 1, category: "Inflation & Prices", timing: "Leading", description: "M2 money supply (cash, checking and savings deposits, money market funds) deflated by the CPI." },
 
   { id: "UMCSENT", frequency: "M", name: "Sentiment", narrative: "Consumer Sentiment", weight: 1, category: "Sentiment & Markets", timing: "Leading", description: "University of Michigan survey of consumer confidence regarding personal finances and business conditions." },
   { id: "VIXCLS", frequency: "D", name: "VIX", narrative: "CBOE Volatility Index", weight: 2, category: "Sentiment & Markets", timing: "Leading", description: "A real-time index that represents the market's expectations for volatility over the coming 30 days." },
@@ -31,9 +31,9 @@ export const INDICATORS = [
 ];
 
 export const INDICATOR_BEHAVIOR = {
-  GDP: "higher_is_better",
+  GDPC1: "higher_is_better",
   PAYEMS: "higher_is_better",
-  RSXFS: "higher_is_better",
+  RRSFS: "higher_is_better",
   UMCSENT: "higher_is_better",
   HOUST: "higher_is_better",
   INDPRO: "higher_is_better",
@@ -50,7 +50,7 @@ export const INDICATOR_BEHAVIOR = {
   DGS2: "lower_is_better", // weight 0, see DGS10
   T10Y2Y: "higher_is_better", // Percentile of the current spread; does not flag a recent inversion that has re-steepened
   FEDFUNDS: "lower_is_better", // Context dependent, but usually ease is better for markets
-  M2SL: "higher_is_better", // Scored on YoY growth: more liquidity supports future activity
+  M2REAL: "higher_is_better", // Scored on real YoY growth: more liquidity supports future activity
   DCOILWTICO: "lower_is_better",
   VIXCLS: "lower_is_better",
   CIVPART: "higher_is_better",

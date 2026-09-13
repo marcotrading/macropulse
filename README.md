@@ -6,8 +6,10 @@ A dashboard of US macroeconomic indicators built on [FRED](https://fred.stlouisf
 
 - **25 indicators** in four groups: Growth & Output, Labor Market, Inflation & Prices, Sentiment & Markets.
 - **5Y rank (0–100)** per indicator: the percentile rank of the latest value within the last 5 years (100 = best, 0 = worst), flipped where lower is better (e.g. unemployment, CPI).
-  - Steadily trending series (GDP, payrolls, CPI, M2…) are scored on year-over-year % change, since their raw level is almost always at a 5-year high.
+  - Steadily trending series (GDP, payrolls, CPI, M2…) are scored on year-over-year % change, since their raw level is almost always at a 5-year high. GDP, retail sales, durable goods orders and M2 are inflation-adjusted.
 - **Composite health score:** weighted average of the ranks, labelled Contraction (<33), Slowing (33–44), Moderate (45–54), Solid Expansion (55–65) or Strong Expansion (66+). The bands and the recession odds shown with them come from a 2000–2026 backtest. Some cards are shown for context only, marked "not in composite".
+- **Cycle breakdown and breadth:** coincident, leading and lagging sub-scores, plus how many indicators are improving or worsening.
+- **Recession alerts:** yield-curve inversion, the Sahm rule and a jobless-claims rule, each with its track record since the 1960s–70s.
 - **Trend arrows:** 3-month change, flat when the move is within 5% of the 5-year range.
 - **Timing filter:** Leading, Coincident or Lagging.
 - **Detail view:** 10-year chart with recession shading, a YoY toggle and an optional comparison series.
@@ -34,10 +36,12 @@ Then open http://localhost:3000.
 ## Customizing indicators
 
 All indicators live in `src/lib/indicators.js`. To add one:
-1. Add an entry to `INDICATORS` with the FRED series id, weight, category, timing and frequency.
+1. Add an entry to `INDICATORS` with the FRED series id, weight, category, timing and frequency (plus a `deflator` price index for a nominal series you want in real terms).
 2. Add its direction (`higher_is_better` / `lower_is_better`) to `INDICATOR_BEHAVIOR`.
 
 Set `weight: 0` to show a card without counting it in the composite.
+
+The band recession odds, the tile averages and the alert track records are fixed numbers. After changing indicators, weights or formulas, run `npm run backtest` and copy the new values into `src/lib/scoring.js` and `src/lib/alerts.js`.
 
 ## Tech stack
 

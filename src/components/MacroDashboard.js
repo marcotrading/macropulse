@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { INDICATORS, INDICATOR_BEHAVIOR } from "@/lib/indicators";
-import { calculateTrend, calculateYoY, formatObservationDate, shiftMonths } from "@/lib/data-transforms";
+import { calculateTrend, calculateYoY, formatObservationDate, shiftMonths, toRealLevels } from "@/lib/data-transforms";
+import { BACKTEST, calculateBreadth, calculateComposite, calculateScore, getCompositeBand } from "@/lib/scoring";
+import { ALERT_SERIES, buildAlerts } from "@/lib/alerts";
 import axios from "axios";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,6 +16,7 @@ import {
 import { ArrowUp, ArrowDown, ArrowRight, Info, Search, Activity } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import IndicatorDetail from "./IndicatorDetail";
+import { AlertsTile, BreadthTile, CycleBreakdownTile } from "./SignalTiles";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
 
@@ -160,44 +163,11 @@ const IndicatorCard = ({ indicator, onClick }) => {
 };
 
 
-// Calculate a 0-100 score based on percentile rank over historical data
-const calculateScore = (id, history) => {
-  if (history.length < 2) return 50; // Default score if not enough data
-
-  const behavior = INDICATOR_BEHAVIOR[id] || "higher_is_better";
-  const latestValue = history.at(-1).value;
-
-  // Midrank percentile against the other n-1 points: the window low scores 0, the high 100,
-  // and ties count half, so repeated values (e.g. an unchanged policy rate) land mid-tie instead of at its bottom
-  const below = history.filter((h) => h.value < latestValue).length;
-  const equalOthers = history.filter((h) => h.value === latestValue).length - 1;
-  const percentile = ((below + 0.5 * equalOthers) / (history.length - 1)) * 100;
-
-  // Invert score for indicators where lower is better
-  if (behavior === "lower_is_better") {
-    return 100 - percentile;
-  }
-
-  return percentile;
-};
-
-// Composite bands from a Sep 2026 backtest of the monthly composite (2000–2026, current indicators, weights and formula).
-// recessionRate: % of months in the band followed by a recession within 12 months (null: none since 2000).
-// Indicative only: revised data, no publication lag, 3 recessions. Re-run the backtest if indicators or weights change.
-const COMPOSITE_MEDIAN = 49;
-const COMPOSITE_BANDS = [
-  { min: 66, label: "Strong Expansion", text: "text-emerald-600", ring: "text-emerald-500", recessionRate: null },
-  { min: 55, label: "Solid Expansion", text: "text-green-600", ring: "text-green-500", recessionRate: null },
-  { min: 45, label: "Moderate", text: "text-amber-600", ring: "text-amber-500", recessionRate: 14 },
-  { min: 33, label: "Slowing", text: "text-orange-600", ring: "text-orange-500", recessionRate: 22 },
-  { min: 0, label: "Contraction", text: "text-rose-600", ring: "text-rose-500", recessionRate: 96 },
-];
-const getCompositeBand = (score) => COMPOSITE_BANDS.find((band) => score >= band.min);
-
 
 export default function MacroDashboard() {
   const [indicators, setIndicators] = useState(null);
   const [error, setError] = useState(null);
+  const [alerts, setAlerts] = useState([]);
   const [selected, setSelected] = useState(null);
   const [filterTiming, setFilterTiming] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,7 +176,8 @@ export default function MacroDashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const ids = INDICATORS.map((i) => i.id).join(",");
+        // Indicator series, the price indexes of inflation-adjusted indicators and the alert inputs, in one request
+        const ids = [...new Set([...INDICATORS.flatMap((i) => [i.id, i.deflator].filter(Boolean)), ...ALERT_SERIES])].join(",");
         console.log("📡 Fetching indicators:", ids);
 
         // Score over the last 5 years; fetch 6 so YoY values cover the whole window
@@ -227,9 +198,11 @@ export default function MacroDashboard() {
           return;
         }
 
+        const seriesData = (id) => res.data.find((r) => r.seriesId === id)?.data || [];
+
         const mapped = INDICATORS.map((meta) => {
-          const found = res.data.find((r) => r.seriesId === meta.id);
-          const rawHistory = found?.data || [];
+          // Nominal series with a deflator are converted to real terms before YoY and scoring
+          const rawHistory = meta.deflator ? toRealLevels(seriesData(meta.id), seriesData(meta.deflator)) : seriesData(meta.id);
           // Trending series (output, payrolls, price levels, M2) sit at a 5-year extreme as levels, so score their YoY % change
           const series = meta.scoreBasis === "yoy" ? calculateYoY(rawHistory) : rawHistory;
           const fullHistory = series.filter((d) => d.date >= scoringStart);
@@ -257,6 +230,7 @@ export default function MacroDashboard() {
         });
 
         setIndicators(mapped);
+        setAlerts(buildAlerts({ spread: seriesData("T10Y2Y"), sahm: seriesData("SAHMREALTIME"), claims: seriesData("ICSA") }));
       } catch (err) {
         console.error("❌ Dashboard load error:", err.message);
         setError("Failed to load data.");
@@ -273,13 +247,13 @@ export default function MacroDashboard() {
       </div>
   );
 
-  // weight 0 excludes an indicator from the composite; only a missing weight defaults to 1
-  const totalWeightedScore = indicators.reduce((sum, i) => sum + i.score * (i.weight ?? 1), 0);
-  const totalWeight = indicators.reduce((sum, i) => sum + (i.weight ?? 1), 0);
+  // weight 0 excludes an indicator from the composite, its timing group and breadth; only a missing weight defaults to 1
   const compositeCount = indicators.filter((i) => (i.weight ?? 1) > 0).length;
-  const composite = Math.round(totalWeightedScore / totalWeight);
+  const composite = Math.round(calculateComposite(indicators));
   const band = getCompositeBand(composite);
-  const medianComparison = composite < COMPOSITE_MEDIAN ? "Below" : composite > COMPOSITE_MEDIAN ? "Above" : "At";
+  const medianComparison = composite < BACKTEST.compositeMedian ? "Below" : composite > BACKTEST.compositeMedian ? "Above" : "At";
+  const cycleScores = Object.fromEntries(["Coincident", "Leading", "Lagging"].map((timing) => [timing, calculateComposite(indicators, timing)]));
+  const breadth = calculateBreadth(indicators);
 
   return (
     <TooltipProvider>
@@ -344,7 +318,7 @@ export default function MacroDashboard() {
                                     {band.label}
                                 </h2>
                                 <p className="text-xs font-medium text-foreground/80 max-w-[220px] mx-auto">
-                                    {medianComparison} the 2000–2026 median ({COMPOSITE_MEDIAN})
+                                    {medianComparison} the 2000–2026 median ({BACKTEST.compositeMedian})
                                     <br />
                                     {band.recessionRate === null
                                         ? "No recession within 12m of similar readings since 2000"
@@ -399,6 +373,13 @@ export default function MacroDashboard() {
                         </div>
                     </div>
                 </div>
+            </section>
+
+            {/* Signals: cycle breakdown, breadth and recession alerts */}
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CycleBreakdownTile scores={cycleScores} activeTiming={filterTiming} onSelectTiming={setFilterTiming} />
+                <BreadthTile breadth={breadth} />
+                <AlertsTile alerts={alerts} />
             </section>
 
           {/* Indicators Grid */}

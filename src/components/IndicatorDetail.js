@@ -30,7 +30,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@radix-ui/react-label";
 import { INDICATORS } from "@/lib/indicators";
-import { calculateYoY, formatObservationDate } from "@/lib/data-transforms";
+import { calculateYoY, formatObservationDate, toRealLevels } from "@/lib/data-transforms";
 
 export default function IndicatorDetail({ indicator, onClose, globalBrushState, setGlobalBrushState }) {
   const [history, setHistory] = useState([]);
@@ -51,10 +51,9 @@ export default function IndicatorDetail({ indicator, onClose, globalBrushState, 
 
     async function fetchAllData() {
       try {
-        let seriesToFetch = `${indicator.id},USREC`;
-        if (comparisonIndicatorId) {
-          seriesToFetch += `,${comparisonIndicatorId}`;
-        }
+        // Inflation-adjusted indicators also need their price index
+        const comparison = INDICATORS.find((i) => i.id === comparisonIndicatorId);
+        const seriesToFetch = [...new Set([indicator.id, "USREC", indicator.deflator, comparisonIndicatorId, comparison?.deflator].filter(Boolean))].join(",");
 
         // Fetch 10 years of history, by date so mixed-frequency series share one range
         const tenYearsAgo = new Date();
@@ -65,13 +64,13 @@ export default function IndicatorDetail({ indicator, onClose, globalBrushState, 
           `/api/fred?series_id=${seriesToFetch}&observation_start=${observation_start}`
         );
 
-        const mainIndicatorData = res.data.find((d) => d.seriesId === indicator.id)?.data || [];
-        const usrecData = res.data.find((d) => d.seriesId === "USREC")?.data || [];
-        const compIndicatorData = res.data.find((d) => d.seriesId === comparisonIndicatorId)?.data || [];
+        const seriesData = (id) => res.data.find((d) => d.seriesId === id)?.data || [];
+        // Charted in real terms (latest-month dollars) when the indicator has a deflator, so the YoY toggle matches the card
+        const levels = (id, deflator) => (deflator ? toRealLevels(seriesData(id), seriesData(deflator)) : seriesData(id));
 
-        setHistory(mainIndicatorData);
-        setUsrecHistory(usrecData);
-        setComparisonHistory(compIndicatorData); // Set comparison history
+        setHistory(levels(indicator.id, indicator.deflator));
+        setUsrecHistory(seriesData("USREC"));
+        setComparisonHistory(comparisonIndicatorId ? levels(comparisonIndicatorId, comparison?.deflator) : []);
 
       } catch (err) {
         console.error("Error fetching extended history:", err.message);

@@ -16,6 +16,8 @@ macro-dashboard/
 ├── package-lock.json
 ├── postcss.config.mjs          # Tailwind CSS v4 via @tailwindcss/postcss
 ├── tsconfig.json               # allowJs, @/* → src/* alias
+├── scripts/
+│   └── backtest-composite.mjs  # `npm run backtest`: composite bands, cycle/breadth averages, alert track records
 ├── public/                     # Static assets (Create Next App SVGs)
 │   ├── file.svg
 │   ├── globe.svg
@@ -31,8 +33,9 @@ macro-dashboard/
     │   ├── layout.tsx          # Fonts + theme provider
     │   └── page.js             # Dashboard entry point
     ├── components/
-    │   ├── MacroDashboard.js   # Fetching, scoring, dashboard UI
+    │   ├── MacroDashboard.js   # Fetching, indicator cards, composite panel, dashboard layout
     │   ├── IndicatorDetail.js  # Detail dialog: history chart, recessions, comparison, YoY
+    │   ├── SignalTiles.js      # Cycle breakdown, breadth and recession alert tiles
     │   ├── mode-toggle.tsx     # Light/dark switch
     │   ├── theme-provider.tsx  # next-themes wrapper
     │   └── ui/                 # shadcn/ui components
@@ -42,7 +45,9 @@ macro-dashboard/
     │       ├── switch.tsx
     │       └── tooltip.tsx
     └── lib/
-        ├── data-transforms.js  # calculateYoY, formatObservationDate
+        ├── alerts.js           # Recession alert rules (yield curve, Sahm rule, jobless claims) + track records
+        ├── data-transforms.js  # calculateYoY, calculateTrend, shiftMonths, toRealLevels, formatObservationDate, formatSigned
         ├── indicators.js       # INDICATORS registry + INDICATOR_BEHAVIOR
+        ├── scoring.js          # calculateScore, calculateComposite, calculateBreadth, composite bands, backtest constants
         └── utils.ts            # cn() class merging
 ```
