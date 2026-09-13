@@ -5,9 +5,10 @@ A dashboard of US macroeconomic indicators built on [FRED](https://fred.stlouisf
 ## What it shows
 
 - **25 indicators** in four groups: Growth & Output, Labor Market, Inflation & Prices, Sentiment & Markets.
-- **Strength score (0–100)** per indicator: the percentile rank of the latest value within the last 5 years, flipped where lower is better (e.g. unemployment, CPI).
+- **5Y rank (0–100)** per indicator: the percentile rank of the latest value within the last 5 years (100 = best, 0 = worst), flipped where lower is better (e.g. unemployment, CPI).
   - Steadily trending series (GDP, payrolls, CPI, M2…) are scored on year-over-year % change, since their raw level is almost always at a 5-year high.
-- **Composite health score:** weighted average of the strength scores. Some cards are shown for context only, marked "not in composite".
+- **Composite health score:** weighted average of the ranks, labelled Contraction (<33), Slowing (33–44), Moderate (45–54), Solid Expansion (55–65) or Strong Expansion (66+). The bands and the recession odds shown with them come from a 2000–2026 backtest. Some cards are shown for context only, marked "not in composite".
+- **Trend arrows:** 3-month change, flat when the move is within 5% of the 5-year range.
 - **Timing filter:** Leading, Coincident or Lagging.
 - **Detail view:** 10-year chart with recession shading, a YoY toggle and an optional comparison series.
 

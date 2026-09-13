@@ -37,26 +37,27 @@ To add an indicator, add entries to both. The dashboard fetches every id in `IND
 
 **Scoring (`MacroDashboard.js`).** The dashboard fetches 6 years of history for every indicator in a single request and scores over the last 5.
 - Indicators with `scoreBasis: "yoy"` are first converted with `calculateYoY` (the extra year feeds the first year-over-year values). Scoring their raw level would pin the score at 0 or 100, because a trending series is almost always at a 5-year extreme.
-- Each indicator's score (0–100) is the percentile rank of its latest value (level, or YoY %) within the 5-year window, inverted for `lower_is_better`.
+- Each indicator's score (0–100) is the midrank percentile of its latest value (level, or YoY %) within the 5-year window: `(below + 0.5 × ties) / (n − 1) × 100`, where `below` and `ties` count the other points under and equal to it. The window low scores 0 and the high 100. The score is inverted for `lower_is_better`.
 - If an indicator has fewer than 2 points, its score defaults to 50.
-- Trend compares the last two observations.
-- Sparklines show only the last 12 points.
+- Trend (`calculateTrend` in `data-transforms.js`) compares the average of the last month of observations with the average of the month ending 3 months earlier, anchored on the latest observation date. A change within 5% of the 5-year range reads flat. The arrow tooltip shows the change (in pp for YoY series).
+- Sparklines show the last 12 months by date.
 - The composite health score is the `weight`-weighted average of all indicator scores. `weight: 0` keeps an indicator's card (marked "not in composite") but excludes it from the composite and the indicator count; a missing weight defaults to 1. Trade Balance and the 2Y/10Y yield levels are weight 0; the rates signal comes from the 10Y–2Y spread (`T10Y2Y`), because yield levels also fall ahead of recessions.
+- The composite label, color and context line come from `COMPOSITE_BANDS` (Contraction <33, Slowing 33–44, Moderate 45–54, Solid Expansion 55–65, Strong Expansion 66+) and `COMPOSITE_MEDIAN`. Their recession rates are static numbers from a Sep 2026 backtest (2000–2026, revised data); re-run it if indicators, weights or the formula change.
 
 **Detail view (`IndicatorDetail.js`).** Opens as a dialog when you select an indicator. It fetches that series together with `USREC`, which it turns into recession shading bands, plus an optional comparison series. The YoY toggle runs `calculateYoY` (`src/lib/data-transforms.js`), which matches points by `YYYY-MM` one year apart, so it assumes monthly-granularity data. `globalBrushState` lives in `MacroDashboard`, so the chart's brushed date range persists across detail views.
 
 <!-- imported-from: gemini:project:instructions -->
 # MacroPulse
 
-MacroPulse is a modern, interactive dashboard built with Next.js that tracks key US macroeconomic indicators in real-time. It aggregates data from the Federal Reserve Economic Data (FRED) API to provide a snapshot of the economic health of the United States.
+MacroPulse is a modern, interactive dashboard built with Next.js that tracks key US macroeconomic indicators, refreshed daily. It aggregates data from the Federal Reserve Economic Data (FRED) API to provide a snapshot of the economic health of the United States.
 
 ## Project Overview
 
 -   **Core Functionality:** Displays a comprehensive dashboard of economic metrics grouped by category (Growth & Output, Labor Market, Inflation & Prices, Sentiment & Markets).
 -   **Data Analysis:**
     -   **Composite Score:** A weighted average score (0-100) representing the overall economic condition.
-    -   **Strength Meter:** Visual percentile rank for each indicator based on historical data (5-year lookback).
-    -   **Trend Analysis:** Visual arrows indicating short-term trends and classification (Leading, Lagging, Coincident).
+    -   **5Y Rank:** Percentile rank of each indicator's latest reading against the last 5 years.
+    -   **Trend Analysis:** Arrows showing 3-month trends and classification (Leading, Lagging, Coincident).
 -   **Tech Stack:**
     -   **Framework:** Next.js 15 (App Router)
     -   **Language:** JavaScript (React components) & TypeScript (Configuration/Layouts)

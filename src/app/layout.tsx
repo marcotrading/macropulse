@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MacroPulse | US Economic Dashboard",
-  description: "Real-time tracking of key US macroeconomic indicators via FRED API.",
+  description: "Daily tracking of key US macroeconomic indicators from FRED.",
 };
 
 export default function RootLayout({

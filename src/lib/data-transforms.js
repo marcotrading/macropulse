@@ -61,3 +61,43 @@ export function calculateYoY(data) {
 
   return yoyData;
 }
+
+/**
+ * Shifts a YYYY-MM-DD string by whole months, without Date objects (no timezone shifts).
+ * The day is kept as-is, so "2026-05-31" minus 3 months gives "2026-02-31"; that still compares correctly as a string bound.
+ *
+ * @param {string} date - Date (YYYY-MM-DD).
+ * @param {number} months - Months to add (negative to go back).
+ * @returns {string} Shifted date (YYYY-MM-DD).
+ */
+export function shiftMonths(date, months) {
+  const [year, month, day] = date.split("-").map(Number);
+  const total = year * 12 + (month - 1) + months;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * 3-month trend: the average of the last month of observations vs the average of the month ending 3 months earlier,
+ * both anchored on the latest observation date. For monthly data that is the latest value vs 3 months back; for quarterly, the previous quarter.
+ * Changes within 5% of the series' range are treated as flat.
+ *
+ * @param {Array<Object>} history - Data points ({date, value}), oldest first.
+ * @returns {{direction: "up"|"down"|"right", change: number|null}} change is null when there is no observation 3 months back.
+ */
+export function calculateTrend(history) {
+  if (!history || history.length < 2) return { direction: "right", change: null };
+
+  const lastDate = history.at(-1).date;
+  const recent = history.filter((d) => d.date > shiftMonths(lastDate, -1));
+  const earlier = history.filter((d) => d.date > shiftMonths(lastDate, -4) && d.date <= shiftMonths(lastDate, -3));
+  if (earlier.length === 0) return { direction: "right", change: null };
+
+  const average = (points) => points.reduce((sum, d) => sum + d.value, 0) / points.length;
+  const change = average(recent) - average(earlier);
+  const values = history.map((d) => d.value);
+  const flatBand = 0.05 * (Math.max(...values) - Math.min(...values));
+
+  // <= so an unchanging series (range 0, change 0) reads flat
+  const direction = Math.abs(change) <= flatBand ? "right" : change > 0 ? "up" : "down";
+  return { direction, change };
+}

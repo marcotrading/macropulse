@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { INDICATORS, INDICATOR_BEHAVIOR } from "@/lib/indicators";
-import { calculateYoY, formatObservationDate } from "@/lib/data-transforms";
+import { calculateTrend, calculateYoY, formatObservationDate, shiftMonths } from "@/lib/data-transforms";
 import axios from "axios";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -26,6 +26,13 @@ const TrendArrow = ({ trend, id, className }) => {
   if (trend === "up") return <ArrowUp className={cn(isUpGood ? "text-green-500" : "text-red-500", className)} />;
   if (trend === "down") return <ArrowDown className={cn(isUpGood ? "text-red-500" : "text-green-500", className)} />;
   return <ArrowRight className={cn("text-muted-foreground", className)} />;
+};
+
+// Tooltip text for the card trend arrow; YoY series change in percentage points
+const formatTrendChange = (change, isYoY) => {
+  if (change === null || change === undefined) return "Not enough history for a 3-month trend";
+  const value = change.toLocaleString("en-US", { maximumFractionDigits: 2, signDisplay: "exceptZero" });
+  return `3-month change: ${value}${isYoY ? " pp" : ""}`;
 };
 
 // A minimal sparkline chart
@@ -110,14 +117,30 @@ const IndicatorCard = ({ indicator, onClick }) => {
                  <div className="w-16 h-8 opacity-80 group-hover:opacity-100 transition-opacity">
                     <Sparkline data={indicator.history} color={trendColor} />
                  </div>
-                 <TrendArrow trend={indicator.trend} id={indicator.id} className="w-5 h-5" />
+                 <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                            <TrendArrow trend={indicator.trend} id={indicator.id} className="w-5 h-5" />
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs p-2">
+                        {formatTrendChange(indicator.trendChange, isYoY)}
+                    </TooltipContent>
+                 </Tooltip>
             </div>
         </div>
 
-        {/* Footer: Strength Meter (Slim Line) */}
+        {/* Footer: 5Y Rank Meter (Slim Line) */}
         <div className="mt-1 space-y-1">
             <div className="flex justify-between text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider">
-                <span>Strength{indicator.weight === 0 ? " · not in composite" : ""}</span>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span>5Y Rank{indicator.weight === 0 ? " · not in composite" : ""}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs p-2">
+                        Latest reading ranked against the last 5 years: 100 = best, 0 = worst.
+                    </TooltipContent>
+                </Tooltip>
                 <span>{Math.round(indicator.score)}/100</span>
             </div>
             <div className="h-1.5 w-full bg-muted/50 rounded-full overflow-hidden">
@@ -144,12 +167,11 @@ const calculateScore = (id, history) => {
   const behavior = INDICATOR_BEHAVIOR[id] || "higher_is_better";
   const latestValue = history.at(-1).value;
 
-  // Sort historical values to find rank
-  const sortedHistory = [...history].map((h) => h.value).sort((a, b) => a - b);
-  const rank = sortedHistory.indexOf(latestValue) + 1;
-
-  // Calculate percentile
-  const percentile = (rank / sortedHistory.length) * 100;
+  // Midrank percentile against the other n-1 points: the window low scores 0, the high 100,
+  // and ties count half, so repeated values (e.g. an unchanged policy rate) land mid-tie instead of at its bottom
+  const below = history.filter((h) => h.value < latestValue).length;
+  const equalOthers = history.filter((h) => h.value === latestValue).length - 1;
+  const percentile = ((below + 0.5 * equalOthers) / (history.length - 1)) * 100;
 
   // Invert score for indicators where lower is better
   if (behavior === "lower_is_better") {
@@ -158,6 +180,19 @@ const calculateScore = (id, history) => {
 
   return percentile;
 };
+
+// Composite bands from a Sep 2026 backtest of the monthly composite (2000–2026, current indicators, weights and formula).
+// recessionRate: % of months in the band followed by a recession within 12 months (null: none since 2000).
+// Indicative only: revised data, no publication lag, 3 recessions. Re-run the backtest if indicators or weights change.
+const COMPOSITE_MEDIAN = 49;
+const COMPOSITE_BANDS = [
+  { min: 66, label: "Strong Expansion", text: "text-emerald-600", ring: "text-emerald-500", recessionRate: null },
+  { min: 55, label: "Solid Expansion", text: "text-green-600", ring: "text-green-500", recessionRate: null },
+  { min: 45, label: "Moderate", text: "text-amber-600", ring: "text-amber-500", recessionRate: 14 },
+  { min: 33, label: "Slowing", text: "text-orange-600", ring: "text-orange-500", recessionRate: 22 },
+  { min: 0, label: "Contraction", text: "text-rose-600", ring: "text-rose-500", recessionRate: 96 },
+];
+const getCompositeBand = (score) => COMPOSITE_BANDS.find((band) => score >= band.min);
 
 
 export default function MacroDashboard() {
@@ -208,17 +243,16 @@ export default function MacroDashboard() {
             };
           }
 
-          const latest = fullHistory.at(-1).value;
-          const prev = fullHistory.at(-2).value;
-
-          // Chart shows last 12 points, score uses full history
-          const chartHistory = fullHistory.slice(-12);
+          // Sparkline shows the last 12 months by date (12 readings would be 12 days of VIX but 3 years of GDP); score uses the full window
+          const chartHistory = fullHistory.filter((d) => d.date > shiftMonths(fullHistory.at(-1).date, -12));
+          const { direction, change } = calculateTrend(fullHistory);
 
           return {
             ...meta,
             history: chartHistory,
             score: calculateScore(meta.id, fullHistory),
-            trend: latest > prev ? "up" : latest < prev ? "down" : "right",
+            trend: direction,
+            trendChange: change,
           };
         });
 
@@ -244,6 +278,8 @@ export default function MacroDashboard() {
   const totalWeight = indicators.reduce((sum, i) => sum + (i.weight ?? 1), 0);
   const compositeCount = indicators.filter((i) => (i.weight ?? 1) > 0).length;
   const composite = Math.round(totalWeightedScore / totalWeight);
+  const band = getCompositeBand(composite);
+  const medianComparison = composite < COMPOSITE_MEDIAN ? "Below" : composite > COMPOSITE_MEDIAN ? "Above" : "At";
 
   return (
     <TooltipProvider>
@@ -261,7 +297,7 @@ export default function MacroDashboard() {
                  {/* Mini Score for Mobile/Sticky Context - Hidden on large screens if we have a Hero */}
                 <div className="hidden md:flex flex-col items-end mr-4">
                     <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider">US Economic Health</span>
-                    <span className={cn("text-sm font-bold", composite >= 66 ? "text-emerald-600" : composite >= 33 ? "text-amber-600" : "text-rose-600")}>
+                    <span className={cn("text-sm font-bold", band.text)}>
                         {composite}/100
                     </span>
                 </div>
@@ -286,7 +322,7 @@ export default function MacroDashboard() {
                                      <circle className="text-muted/20" strokeWidth="8" stroke="currentColor" fill="transparent" r="40" cx="50" cy="50" />
                                      <circle 
                                         className={cn("transition-all duration-1000 ease-out", 
-                                            composite >= 66 ? "text-emerald-500" : composite >= 33 ? "text-amber-500" : "text-rose-500"
+                                            band.ring
                                         )} 
                                         strokeWidth="8" 
                                         strokeLinecap="round" 
@@ -305,9 +341,16 @@ export default function MacroDashboard() {
                              
                              <div className="mt-4 space-y-1">
                                 <h2 className="text-lg font-semibold">
-                                    {composite >= 66 ? "Strong Expansion" : composite >= 33 ? "Moderate Growth" : "Contraction Risk"}
+                                    {band.label}
                                 </h2>
-                                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
+                                <p className="text-xs font-medium text-foreground/80 max-w-[220px] mx-auto">
+                                    {medianComparison} the 2000–2026 median ({COMPOSITE_MEDIAN})
+                                    <br />
+                                    {band.recessionRate === null
+                                        ? "No recession within 12m of similar readings since 2000"
+                                        : `Recession within 12m followed ${band.recessionRate}% of similar readings`}
+                                </p>
+                                <p className="text-xs text-muted-foreground max-w-[220px] mx-auto">
                                     Weighted aggregate of {compositeCount} key economic indicators.
                                 </p>
                              </div>
@@ -320,7 +363,7 @@ export default function MacroDashboard() {
                     <div className="flex flex-col gap-2">
                          <h2 className="text-2xl font-bold tracking-tight text-foreground/90">Economic Indicators</h2>
                          <p className="text-muted-foreground max-w-2xl">
-                            Track real-time data from the Federal Reserve. Filter by timing to see leading signals or search for specific metrics.
+                            Daily-refreshed data from FRED (Federal Reserve Bank of St. Louis). Filter by timing to see leading signals or search for specific metrics.
                          </p>
                     </div>
                     
